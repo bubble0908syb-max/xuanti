@@ -6,10 +6,9 @@ from scipy.fftpack import fft
 
 # ================= 配置参数 =================
 fs = 20000  # 采样率 20kHz
-# 随便挑一个分类和文件进行效果抽查
-category = '0.4mm leak'
-original_file_path = f'./data/{category}/0.4mm-1-1-4.xlsx'  # 替换为你的原始文件实际名
-denoised_file_path = f'./denoised_data/{category}/0.4mm-1-1-4_denoised.csv'  # 替换为对应的去噪文件名
+# 请确保下面两个路径是你本地真实存在的路径
+original_file_path = r'./data/0.4mm leak/0.4mm-1-1-4.xlsx'
+denoised_file_path = r'./denoised_data/0.4mm leak/0.4mm-1-1-4_denoised.csv'
 
 # 中文显示字体设置 (防止画图时中文乱码)
 plt.rcParams['font.sans-serif'] = ['SimHei']  # Windows 用黑体
@@ -34,14 +33,14 @@ def calculate_metrics(raw, denoised):
     """
     noise = raw - denoised
 
-    # 1. 均方根误差 (RMSE): 反映去噪前后信号的整体差异
+    # 1. 均方根误差 (RMSE)
     rmse = np.sqrt(np.mean(noise ** 2))
 
     # 2. 原始信号的标准差 vs 去噪后信号的标准差
     std_raw = np.std(raw)
     std_denoised = np.std(denoised)
 
-    # 3. 互相关系数 (Correlation): 反映去噪后信号保留原始特征的程度，越接近 1 越好
+    # 3. 互相关系数 (Correlation)
     corr = np.corrcoef(raw, denoised)[0, 1]
 
     return rmse, std_raw, std_denoised, corr
@@ -51,15 +50,24 @@ def main():
     # 1. 读取数据
     print(f"正在加载数据...\n原文件: {original_file_path}\n去噪文件: {denoised_file_path}")
     try:
-        # 如果你这里原始文件是 xlsx，请换成 pd.read_excel(..., engine='openpyxl')
-        raw_data = pd.read_csv(original_file_path, header=None).iloc[:, -1].values.flatten()
+        # 💡 核心修复：自动判断原始文件是 xlsx 还是 csv
+        if original_file_path.endswith('.xlsx') or original_file_path.endswith('.xls'):
+            raw_data = pd.read_excel(original_file_path, header=None, engine='openpyxl').iloc[:, -1].values.flatten()
+        else:
+            raw_data = pd.read_csv(original_file_path, header=None).iloc[:, -1].values.flatten()
+
+        # 去噪后的数据我们之前统一保存为了 CSV 格式
         denoised_data = pd.read_csv(denoised_file_path, header=None).iloc[:, -1].values.flatten()
+
     except FileNotFoundError:
         print("❌ 找不到文件，请检查文件路径和文件名是否填写正确！")
         return
+    except Exception as e:
+        print(f"❌ 读取文件时出错: {e}")
+        return
 
-    # 为了画图清晰，如果数据点太多(比如一秒钟2万个点)，我们截取前 2000 个点 (0.1秒) 展示
-    display_len = min(2000, len(raw_data))
+    # 为了画图清晰，截取前 2000 个点 (0.1秒) 展示
+    display_len = min(20000, len(raw_data))
     t = np.arange(display_len) / fs
 
     raw_disp = raw_data[:display_len]
